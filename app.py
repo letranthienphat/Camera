@@ -3,88 +3,134 @@ import os
 import time
 from PIL import Image
 
-# --- CẤU HÌNH GIAO DIỆN ---
-st.set_page_config(page_title="AI Surveillance Pro", layout="wide")
+# --- CẤU HÌNH GIAO DIỆN CHUYÊN NGHIỆP ---
+st.set_page_config(page_title="Hệ thống Giám sát AI", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background: #050505; color: #00ff00; }
-    .camera-box { border: 2px solid #00ff00; border-radius: 15px; padding: 10px; background: #000; }
-    .status-bar { padding: 10px; border-radius: 10px; background: #111; border-left: 5px solid #ff0000; margin-bottom: 20px; }
-    /* Giấu nút chụp mặc định của Streamlit để giao diện sạch hơn */
+    /* Tổng thể giao diện Dark Mode */
+    .stApp { background: #0a0a0a; color: #00ffcc; }
+    
+    /* Header chuyên nghiệp */
+    .main-header { 
+        padding: 20px; 
+        border-bottom: 2px solid #00ffcc; 
+        text-align: center; 
+        background: rgba(0, 255, 204, 0.05);
+        box-shadow: 0 4px 15px rgba(0, 255, 204, 0.2);
+    }
+    
+    /* Khung Camera */
+    .cam-card {
+        border: 1px solid #333;
+        border-radius: 10px;
+        padding: 5px;
+        background: #111;
+        transition: all 0.3s;
+    }
+    .cam-card:hover { border-color: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
+
+    /* Hiệu ứng nhấp nháy REC */
+    .rec-icon {
+        color: #ff0000;
+        font-weight: bold;
+        animation: blink 1s infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Giấu toàn bộ nút bấm dư thừa để giao diện sạch */
     button[title="Take Photo"] { display: none !important; }
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
 STORAGE = "cctv_storage"
 if not os.path.exists(STORAGE): os.makedirs(STORAGE)
 
-# --- KHÓA BẢO MẬT ---
+# --- BẢO MẬT ---
 if 'auth' not in st.session_state: st.session_state.auth = False
 if not st.session_state.auth:
-    pwd = st.sidebar.text_input("🔑 ACCESS CODE:", type="password")
+    st.markdown("<div class='main-header'><h1>🔐 HỆ THỐNG ĐƯỢC BẢO VỆ</h1></div>", unsafe_allow_html=True)
+    pwd = st.text_input("Mật khẩu truy cập (1111):", type="password")
     if pwd == "1111":
         st.session_state.auth = True
         st.rerun()
     st.stop()
 
-# --- ĐIỀU HƯỚNG ---
-role = st.sidebar.radio("HỆ THỐNG", ["🖥️ GIÁM SÁT", "📷 CAMERA"])
+# --- MENU CHỌN CHẾ ĐỘ ---
+mode = st.sidebar.selectbox("CHỨC NĂNG", ["🖥️ MÀN HÌNH TRUNG TÂM", "🎥 CHẾ ĐỘ QUAY VIDEO"])
 
-if role == "📷 CAMERA":
-    st.markdown("<div class='status-bar'>📡 TRẠM PHÁT ĐANG CHỜ KÍCH HOẠT...</div>", unsafe_allow_html=True)
-    cam_name = st.text_input("Tên máy:", "ZONE-01")
+# --- MÁY QUAY (TỰ ĐỘNG QUAY KHÔNG CẦN BẤM) ---
+if mode == "🎥 CHẾ ĐỘ QUAY VIDEO":
+    st.markdown("<div class='main-header'><h1>🎥 LIVE STREAMING STATION</h1></div>", unsafe_allow_html=True)
+    cam_name = st.text_input("ĐẶT TÊN CAMERA:", "CAM_01")
     
-    # Hướng dẫn thông minh
-    st.info("💡 CHỈ CẦN CHẠM VÀO MÀN HÌNH ĐỂ BẮT ĐẦU QUAY TỰ ĐỘNG")
+    # Ẩn hướng dẫn, hiển thị trạng thái
+    st.markdown("### <span class='rec-icon'>● REC</span> ĐANG QUAY VÀ TRUYỀN DỮ LIỆU TỰ ĐỘNG", unsafe_allow_html=True)
 
-    img_data = st.camera_input("KÍCH HOẠT SENSOR")
+    # Widget Camera
+    img_data = st.camera_input("Bật Camera")
 
     if img_data:
-        # Lưu ảnh chất lượng nén để mượt hơn
         img = Image.open(img_data)
-        img.save(f"{STORAGE}/{cam_name}.jpg", quality=35)
+        img.save(f"{STORAGE}/{cam_name}.jpg", quality=50)
         
-        st.markdown(f"🟢 **{cam_name}** đang truyền tín hiệu...")
-
-        # --- CƠ CHẾ THÔNG MINH: AUTO-INJECTOR V2 ---
-        # Tự động tìm nút chụp và bấm liên tục sau khi người dùng kích hoạt 1 lần
+        # SCRIPT THÔNG MINH: Tự động nhấn nút chụp liên tục không ngừng
         st.components.v1.html(
             """
             <script>
-            function startCCTV() {
+            function forceCapture() {
+                // Tìm tất cả các button trong trang web của Streamlit
                 const buttons = window.parent.document.querySelectorAll('button');
                 for (let btn of buttons) {
+                    // Tự động tìm nút Chụp ảnh dựa trên văn bản hoặc thuộc tính
                     if (btn.innerText.includes("Take Photo") || btn.innerText.includes("Chụp ảnh")) {
                         btn.click();
                         break;
                     }
                 }
             }
-            // Tốc độ cao: 600ms (Gần như video)
-            setTimeout(startCCTV, 600);
+            // Tốc độ cực cao: 500ms (Xấp xỉ tốc độ quay video)
+            setTimeout(forceCapture, 500);
             </script>
             """,
             height=0,
         )
 
+# --- MÁY CHỦ (GIAO DIỆN CHUYÊN NGHIỆP) ---
 else:
-    st.markdown("<h1>🖥️ CONTROL CENTER</h1>", unsafe_allow_html=True)
-    refresh = st.sidebar.slider("Tốc độ quét (s)", 0.2, 2.0, 0.5)
+    st.markdown("<div class='main-header'><h1>🖥️ NETWORK MONITORING SYSTEM</h1></div>", unsafe_allow_html=True)
+    
+    # Sidebar điều khiển
+    grid = st.sidebar.slider("Bố cục màn hình (Số cột)", 1, 4, 2)
+    speed = st.sidebar.slider("Tốc độ quét tín hiệu (giây)", 0.1, 2.0, 0.5)
     
     placeholder = st.empty()
+    
     while True:
         with placeholder.container():
             files = [f for f in os.listdir(STORAGE) if f.endswith(".jpg")]
+            
             if not files:
-                st.write("🔦 Đang tìm kiếm tín hiệu...")
+                st.info("📡 Đang tìm kiếm tín hiệu camera trong mạng...")
             else:
-                cols = st.columns(3)
-                for idx, f in enumerate(files):
-                    f_path = os.path.join(STORAGE, f)
-                    # Kiểm tra xem cam còn online không
-                    active = (time.time() - os.path.getmtime(f_path)) < 5
-                    with cols[idx % 3]:
-                        st.markdown(f"{'🟢' if active else '🔴'} **{f.replace('.jpg','')}**")
-                        st.image(f_path, use_container_width=True)
-        time.sleep(refresh)
+                cols = st.columns(grid)
+                for idx, f_name in enumerate(files):
+                    f_path = os.path.join(STORAGE, f_name)
+                    
+                    # Kiểm tra xem camera còn sống không (trong 5 giây gần nhất)
+                    online = (time.time() - os.path.getmtime(f_path)) < 5
+                    
+                    with cols[idx % grid]:
+                        st.markdown(f"""
+                            <div class='cam-card'>
+                                <p style='margin:0;'>{'🟢' if online else '🔴'} <b>{f_name.replace('.jpg','')}</b></p>
+                                <p style='font-size:10px; margin:0;'>Tình trạng: {'LIVE STREAMING' if online else 'DISCONNECTED'}</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        try:
+                            st.image(f_path, use_container_width=True)
+                        except: pass
+                        
+        time.sleep(speed)
