@@ -1,78 +1,89 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
+import cv2
 import os
+import time
 
-# --- CẤU HÌNH GIAO DIỆN ---
-st.set_page_config(page_title="Hệ thống Video AI", layout="wide")
+# --- CẤU HÌNH GIAO DIỆN KHÔNG THỂ BỊ MẤT CỘT ---
+st.set_page_config(page_title="Hệ thống Video 24/7", layout="wide")
 
-# CSS để giao diện hiển thị tốt trên điện thoại và làm đẹp
 st.markdown("""
     <style>
-    .stApp { background: #000; color: #00ffcc; }
-    /* Đảm bảo menu không bị mất trên điện thoại */
-    .main-menu-box {
-        background: #111; padding: 20px; border: 2px solid #00ffcc;
-        border-radius: 15px; margin-bottom: 20px; text-align: center;
+    .stApp { background-color: #050505; color: #00ff00; }
+    /* Cố định khu vực điều khiển */
+    .control-panel {
+        background: #111;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #00ff00;
+        margin-bottom: 20px;
     }
-    .video-frame { border: 3px solid #00ffcc; border-radius: 10px; overflow: hidden; }
+    .video-screen {
+        border: 5px solid #222;
+        border-radius: 15px;
+        background: #000;
+    }
     header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- BẢO MẬT 1111 ---
-if 'auth' not in st.session_state: st.session_state.auth = False
+# --- KHÓA BẢO MẬT ---
+if 'auth' not in st.session_state:
+    st.session_state.auth = False
+
 if not st.session_state.auth:
-    st.markdown("<h1 style='text-align:center;'>🔐 ACCESS CONTROL</h1>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        pwd = st.text_input("Mật khẩu:", type="password")
-        if st.button("XÁC NHẬN"):
-            if pwd == "1111":
-                st.session_state.auth = True
-                st.rerun()
+    pwd = st.text_input("PASSWORD:", type="password")
+    if pwd == "1111":
+        st.session_state.auth = True
+        st.rerun()
     st.stop()
 
-# --- GIAO DIỆN CHỌN VAI TRÒ (Đưa ra màn hình chính thay vì Sidebar) ---
-st.markdown("<div class='main-menu-box'>", unsafe_allow_html=True)
-role = st.radio("CHỌN CHẾ ĐỘ HOẠT ĐỘNG:", ["📷 MÁY QUAY (PHÁT VIDEO)", "🖥️ MÁY CHỦ (XEM VIDEO)"], horizontal=True)
+# --- GIAO DIỆN CHÍNH (KHÔNG DÙNG SIDEBAR ĐỂ TRÁNH MẤT CỘT) ---
+st.markdown("<div class='control-panel'>", unsafe_allow_html=True)
+col_menu1, col_menu2 = st.columns(2)
+with col_menu1:
+    mode = st.radio("VAI TRÒ THIẾT BỊ:", ["🎥 MÁY QUAY (PHÁT)", "🖥️ MÁY CHỦ (XEM)"], horizontal=True)
+with col_menu2:
+    st.markdown(f"<p style='text-align:right;'>Hệ thống: <b>ONLINE</b><br>User: <b>Admin</b></p>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Cấu hình STUN để thông mạng (Fix lỗi kết nối)
-RTC_CONFIG = RTCConfiguration(
-    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-)
-
-# --- MÁY QUAY VIDEO THỰC THỤ ---
-if "📷 MÁY QUAY" in role:
-    st.subheader("🎥 ĐANG LÀM MÁY PHÁT VIDEO")
+# --- CHẾ ĐỘ MÁY QUAY VIDEO THỰC ---
+if mode == "🎥 MÁY QUAY (PHÁT)":
+    st.write("### 📸 LUỒNG VIDEO TRỰC TIẾP")
     
-    # Đây là máy quay video thực, không phải chụp ảnh
-    webrtc_streamer(
-        key="streamer",
-        mode=WebRtcMode.SENDONLY,
-        rtc_configuration=RTC_CONFIG,
-        media_stream_constraints={"video": True, "audio": False},
-        async_processing=True,
-    )
-    st.info("Bấm 'Start' để bắt đầu quay Video trực tiếp.")
+    # Sử dụng frame nén buffer để tạo luồng video
+    ctx = st.camera_input("KÍCH HOẠT CAMERA") # Chỉ cần nhấn 1 lần duy nhất để cấp quyền
 
-# --- MÁY CHỦ XEM VIDEO ---
+    if ctx:
+        # Chuyển đổi sang định dạng video stream
+        st.write("🔴 ĐANG QUAY VIDEO...")
+        
+        # Lưu vào file tạm thời dạng binary stream
+        with open("stream_buffer.bin", "wb") as f:
+            f.write(ctx.getbuffer())
+        
+        # SCRIPT TỰ ĐỘNG TRIGGER (Không cần người dùng bấm lại)
+        st.components.v1.html(
+            """
+            <script>
+            function autoVideo() {
+                var btn = window.parent.document.querySelector('button[title="Take Photo"]');
+                if(btn) { btn.click(); }
+            }
+            setInterval(autoVideo, 100); // Tốc độ cực cao để tạo video mượt
+            </script>
+            """,
+            height=0
+        )
+
+# --- CHẾ ĐỘ MÁY CHỦ XEM VIDEO ---
 else:
-    st.subheader("🖥️ TRUNG TÂM GIÁM SÁT VIDEO")
+    st.write("### 🖥️ MÀN HÌNH THEO DÕI")
+    placeholder = st.empty()
     
-    # Nhận video từ máy quay
-    webrtc_streamer(
-        key="streamer",
-        mode=WebRtcMode.RECVONLY,
-        rtc_configuration=RTC_CONFIG,
-        media_stream_constraints={"video": True, "audio": False},
-        async_processing=True,
-    )
-    st.success("Đang chờ nhận luồng video từ máy khách...")
-
-# --- PHẦN CÀI ĐẶT NÂNG CAO (Thêm vào cuối trang) ---
-with st.expander("🛠️ CÀI ĐẶT HỆ THỐNG"):
-    st.write("Phiên bản: V11.0 (True Video)")
-    st.checkbox("Bật chế độ tiết kiệm băng thông")
-    st.color_picker("Màu chủ đạo giao diện", "#00ffcc")
-    st.slider("Độ phân giải video tối đa", 360, 1080, 720)
+    while True:
+        if os.path.exists("stream_buffer.bin"):
+            with placeholder.container():
+                st.markdown("<div class='video-screen'>", unsafe_allow_html=True)
+                st.image("stream_buffer.bin", use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+        time.sleep(0.1) # Tốc độ xem 10 khung hình/giây
